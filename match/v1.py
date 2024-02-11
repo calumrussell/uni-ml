@@ -1,59 +1,9 @@
 import os
+from scipy.stats import poisson
+import numpy as np
+from sklearn.metrics import brier_score_loss
 
-from common import get_train_set
-
-from sklearn.linear_model import PoissonRegressor
-
-class V1Trainer:
-
-    def __init__(self):
-        self.matches = {}
-        self.ratings = []
-        self.window_length = 10
-        ## Dataset shouldn't have double records but this is included to make sure that the same match
-        ## isn't counted twice (which can happen if you have a row for the home and away team)
-        self.calculated = {}
-        return
-
-    def _optimize(self):
-        teams = self.matches.keys()
-        for team in teams:
-            team_matches = self.matches[team]
-            if len(team_matches) > self.window_length:
-                window = team_matches[-self.window_length:]
-            else:
-                window = team_matches
-
-            ## The date that the rating is before the last result
-            last_date = window[-1][2]
-            if hash(str(team) + str(last_date)) not in self.calculated:
-                goals_for = [i[0] for i in window]
-                goals_against = [i[1] for i in window]
-                ## Each regression is composed of matches for a single team, so we are just aiming
-                ## to recover the X value for a single team at a time
-                team_input = [[1] for i in window]
-
-                off_model = PoissonRegressor(fit_intercept=False, alpha=0)
-                off_model.fit(team_input,goals_for)
-
-                def_model = PoissonRegressor(fit_intercept=False, alpha=0)
-                def_model.fit(team_input,goals_against)
-
-                # We do this to recover the Poisson variable itself
-                off_rating = off_model.predict([[1]])[0]
-                def_rating = def_model.predict([[1]])[0]
-                self.ratings.append([team, off_rating, def_rating, last_date])
-
-    def update(self, home_team, away_team, home_goals, away_goals, date):
-        if home_team not in self.matches:
-            self.matches[home_team] = []
-        if away_team not in self.matches:
-            self.matches[away_team] = []
-
-        self.matches[home_team].append([home_goals, away_goals, date])
-        self.matches[away_team].append([away_goals, home_goals, date])
-        self._optimize()
-        return
+from common import get_train_set, PoissonTrainer
 
 class V1:
     """
@@ -69,18 +19,76 @@ class V1:
     @staticmethod
     def train():
         """
-        Train should return a copy of self with the actual completed model. So train is an object
-        creator.
+        Training is more complex because we are building X Poisson regressions over Y*2*2 matches where
+        X is the number of teams and Y is the number of matches (one for each team, one for off/def).
+
+        To build a prediction for a match we need to get the off/def ratings for each team using all matches
+        up until that point.
         """
-        trainer = V1Trainer()
+        trainer = PoissonTrainer()
 
         results = get_train_set()
         for match in results:
             home_id = match["team_id"]
             away_id = match["opp_id"]
 
-            trainer.update(home_id, away_id, match["goal_for"], match["goal_against"], match["start_date"])
-        print(trainer.ratings)
+            trainer.update(home_id, away_id, match["goal_for"], match["goal_against"], match["start_date"], match["match_id"])
+        ratings = trainer.ratings
+
+        grouped_ratings = []
+        for match in ratings:
+            if len(ratings[match]) != 2:
+                continue
+
+            home_idx = 0 if ratings[match][0][5] == 1 else 0
+            away_idx = 0 if home_idx == 1 else 1
+
+            home_off_rating = ratings[match][home_idx][1]
+            home_def_rating = ratings[match][home_idx][2]
+            away_off_rating = ratings[match][away_idx][1]
+            away_def_rating = ratings[match][away_idx][2]
+
+            home_goal_diff = ratings[match][home_idx][4]
+            result = 'loss'
+            if home_goal_diff > 0:
+                result = 'win'
+            elif home_goal_diff == 0:
+                result = 'draw'
+
+            grouped_ratings.append([home_off_rating, home_def_rating, away_off_rating, away_def_rating, result])
+
+        actuals = []
+        pred = []
+        for rating in grouped_ratings:
+            ## Convert the Poisson variables into a goal prediction
+
+            ## Multiply home off rating by away def rating to get expected goals for home
+            ## Multiply away off rating by home def rating to get expected goals for away
+            home_exp = rating[0] * rating[3]
+            away_exp = rating[2] * rating[1]
+
+            probs = []
+            for i in range(0, 10):
+                for j in range(0, 10):
+                    home_prob = poisson.pmf(i, home_exp)
+                    away_prob = poisson.pmf(j, away_exp)
+                    probs.append(home_prob * away_prob)
+
+            split = [probs[i:i+10] for i in range(0,len(probs),10)]
+
+            draw_prob = (np.sum(np.diag(split)))
+            win_prob = (np.sum(np.tril(split, -1)))
+            loss_prob = (np.sum(np.triu(split, 1)))
+
+            outcome = rating[4]
+            win = 1 if outcome == "win" else 0
+            draw = 1 if outcome == "draw" else 0
+            loss = 1 if outcome == "loss" else 0
+
+            pred.extend([win_prob, draw_prob, loss_prob])
+            actuals.extend([win, draw, loss])
+        print(brier_score_loss(actuals, pred))
+
 
 
 if __name__ == "__main__":
