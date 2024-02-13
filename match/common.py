@@ -1,6 +1,8 @@
 import json
 
 from sklearn.linear_model import PoissonRegressor
+from scipy.stats import poisson
+import numpy as np
 
 class PoissonTrainer:
 
@@ -65,6 +67,53 @@ class PoissonTrainer:
         self._optimize()
         return
 
+    def get_predictions(self):
+        match_predictions = {}
+
+        for match in self.ratings:
+            if len(self.ratings[match]) != 2:
+                continue
+
+            home_idx = 0 if self.ratings[match][0][5] == 1 else 0
+            away_idx = 0 if home_idx == 1 else 1
+
+            home_off_rating = self.ratings[match][home_idx][1]
+            home_def_rating = self.ratings[match][home_idx][2]
+            away_off_rating = self.ratings[match][away_idx][1]
+            away_def_rating = self.ratings[match][away_idx][2]
+
+            home_goal_diff = self.ratings[match][home_idx][4]
+
+            ## Multiply home off rating by away def rating to get expected goals for home
+            ## Multiply away off rating by home def rating to get expected goals for away
+            home_exp = home_off_rating * away_def_rating
+            away_exp = away_off_rating * home_def_rating
+
+            probs = []
+            for i in range(0, 10):
+                for j in range(0, 10):
+                    home_prob = poisson.pmf(i, home_exp)
+                    away_prob = poisson.pmf(j, away_exp)
+                    probs.append(home_prob * away_prob)
+
+            split = [probs[i:i+10] for i in range(0,len(probs),10)]
+
+            draw_prob = (np.sum(np.diag(split)))
+            win_prob = (np.sum(np.tril(split, -1)))
+            loss_prob = (np.sum(np.triu(split, 1)))
+
+            win = 0
+            draw = 0
+            loss = 0
+            if home_goal_diff > 0:
+                win = 1
+            elif home_goal_diff == 0:
+                draw = 1
+            else:
+                loss = 1
+
+            match_predictions[match] = [(win_prob, draw_prob, loss_prob), (win, draw, loss)]
+        return match_predictions
 
 def get_train_set():
     with open('data/train_match_results.json') as f:
