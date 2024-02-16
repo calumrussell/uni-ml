@@ -67,8 +67,8 @@ class PoissonTrainer:
         self._optimize()
         return
 
-    def get_predictions(self):
-        match_predictions = {}
+    def get_ratings(self):
+        match_ratings = {}
 
         for match in self.ratings:
             if len(self.ratings[match]) != 2:
@@ -89,31 +89,28 @@ class PoissonTrainer:
             home_exp = home_off_rating * away_def_rating
             away_exp = away_off_rating * home_def_rating
 
-            probs = []
-            for i in range(0, 10):
-                for j in range(0, 10):
-                    home_prob = poisson.pmf(i, home_exp)
-                    away_prob = poisson.pmf(j, away_exp)
-                    probs.append(home_prob * away_prob)
+            match_ratings[match] = (home_exp, away_exp, home_goal_diff)
+        return match_ratings
 
-            split = [probs[i:i+10] for i in range(0,len(probs),10)]
+    @staticmethod
+    def convert_match_rating_to_probability_model(match_rating, model):
+        return model.predict_proba(match_rating)
 
-            draw_prob = (np.sum(np.diag(split)))
-            win_prob = (np.sum(np.tril(split, -1)))
-            loss_prob = (np.sum(np.triu(split, 1)))
+    @staticmethod
+    def convert_match_rating_to_probability_param(match_rating):
+        probs = []
+        for i in range(0, 10):
+            for j in range(0, 10):
+                home_prob = poisson.pmf(i, match_rating[0])
+                away_prob = poisson.pmf(j, match_rating[1])
+                probs.append(home_prob * away_prob)
 
-            win = 0
-            draw = 0
-            loss = 0
-            if home_goal_diff > 0:
-                win = 1
-            elif home_goal_diff == 0:
-                draw = 1
-            else:
-                loss = 1
+        split = [probs[i:i+10] for i in range(0,len(probs),10)]
 
-            match_predictions[match] = [(win_prob, draw_prob, loss_prob), (win, draw, loss)]
-        return match_predictions
+        draw_prob = (np.sum(np.diag(split)))
+        win_prob = (np.sum(np.tril(split, -1)))
+        loss_prob = (np.sum(np.triu(split, 1)))
+        return (win_prob, draw_prob, loss_prob)
 
 def get_train_set():
     with open('data/train_match_results.json') as f:
