@@ -172,10 +172,3 @@ class V1PoissonToPoissonProbability:
         obj = V1PoissonToPoissonProbability(score)
         write_model("v1_poisson", obj)
         return obj
-
-if __name__ == "__main__":
-    m = V1PoissonToLogisticProbability.train(50)
-    print(m.score)
-
-    m1 = V1PoissonToPoissonProbability.train(50)
-    print(m1.score)

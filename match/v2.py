@@ -1,10 +1,8 @@
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import RandomizedSearchCV
-from scipy.stats import poisson
-import numpy as np
 from sklearn.preprocessing import LabelBinarizer
 
-from common import get_train_set, PoissonRatingTrainer, get_train_set_expected_goals, make_brier_multi_scorer_with_lb, brier_multi, write_model, get_model_best_score
+from common import get_train_set, PoissonRatingTrainer, get_train_set_expected_goals, make_brier_multi_scorer_with_lb, write_model
 
 def random_search_cv_logistic(x, y):
 
@@ -100,9 +98,5 @@ class V2PoissonToLogisticProbability:
 
         (model, score) = random_search_cv_logistic(x, y)
         obj = V2PoissonToLogisticProbability(model, score)
-        write_model("v1_logistic", obj)
+        write_model("v2", obj)
         return obj
-
-if __name__ == "__main__":
-    v2 = V2PoissonToLogisticProbability.train(50)
-    print(v2.score)

@@ -72,8 +72,9 @@ def get_model_best_score():
         version, epoch = path.split("_")
         with open(f"shot/models/{model_path}", "rb") as f:
             tmp_model = pickle.load(f)
-            if tmp_model.score > last_score:
+            if float(tmp_model.score) > last_score:
                 best_model = tmp_model
+                last_score = tmp_model.score
     return best_model
 
 def get_model_most_recent():
