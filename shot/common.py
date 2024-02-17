@@ -63,21 +63,20 @@ def get_test_set():
             shots.append(json.loads(line))
     return shots
 
-def get_model_best_score(model_version):
+def get_model_best_score():
     last_score = 0
     best_model = None
     models = os.listdir('shot/models')
     for model_path in models:
         path, extension = model_path.split(".")
         version, epoch = path.split("_")
-        if version == model_version:
-            with open(f"shot/models/{model_path}", "rb") as f:
-                tmp_model = pickle.load(f)
-                if tmp_model.score > last_score:
-                    best_model = tmp_model
+        with open(f"shot/models/{model_path}", "rb") as f:
+            tmp_model = pickle.load(f)
+            if tmp_model.score > last_score:
+                best_model = tmp_model
     return best_model
 
-def get_model_most_recent(model_version):
+def get_model_most_recent():
     last = -1
     most_recent_model_path = None
 
@@ -85,9 +84,9 @@ def get_model_most_recent(model_version):
     for model_path in models:
         path, extension = model_path.split(".")
         version, epoch = path.split("_")
-        if version == model_version and int(epoch) > last:
+        if int(epoch) > int(last):
             last = epoch
-            most_recent_model_path = model
+            most_recent_model_path = model_path
 
     if most_recent_model_path:
         with open(f"shot/models/{most_recent_model_path}", "rb") as f:

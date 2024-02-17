@@ -109,13 +109,17 @@ class Shot:
             "assisted": self.assisted,
             "first_touch": self.first_touch,
             "result": self.result,
+            "match_id": self.match_id,
+            "team_id": self.team_id,
         })
 
-    def __init__(self, event):
+    def __init__(self, event, match_id):
         self.event = event
         self.x = event['x']
         self.y = event['y']
+        self.match_id = match_id
         self.player_id = event.get('playerId')
+        self.team_id = event.get('teamId')
         self.event_id = event.get('eventId')
         self.qualifiers = event.get('qualifiers', [])
         self.distance = self._calc_distance()
@@ -160,7 +164,7 @@ if __name__ == "__main__":
                     types = event['satisfiedEventsTypes']
                     ##This tests if the type is a shot
                     if 10 in types:
-                        shot = Shot(event)
+                        shot = Shot(event, match_id)
                         f.write(json.dumps(shot.to_dict()) + "\n")
         f.close()
 
@@ -178,6 +182,6 @@ if __name__ == "__main__":
                     types = event['satisfiedEventsTypes']
                     ##This tests if the type is a shot
                     if 10 in types:
-                        shot = Shot(event)
+                        shot = Shot(event, match_id)
                         f.write(json.dumps(shot.to_dict()) + "\n")
         f.close()

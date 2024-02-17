@@ -4,7 +4,7 @@ from scipy.stats import poisson
 import numpy as np
 from sklearn.preprocessing import LabelBinarizer
 
-from common import get_train_set, PoissonRatingTrainer, make_brier_multi_scorer_with_lb, brier_multi
+from common import get_train_set, PoissonRatingTrainer, make_brier_multi_scorer_with_lb, brier_multi, write_model, get_model_best_score
 
 def random_search_cv_logistic(x, y):
 
@@ -104,16 +104,17 @@ class V1PoissonToLogisticProbability:
             y.append(result)
 
         (model, score) = random_search_cv_logistic(x, y)
-        ##Score for this model maximises a negative by flipping sign, so have to flip back.
-        return V1PoissonToLogisticProbability(model, score*-1)
+        obj = V1PoissonToLogisticProbability(model, score)
+        write_model("v1_logistic", obj)
+        return obj
 
 class V1PoissonToPoissonProbability:
     """
     Goes from team rating to match probability using Poisson pmf.
     """
 
-    def __init__(self):
-        pass
+    def __init__(self, score):
+        self.score = score
 
     def predict(self, home_rating, away_rating):
         probs = V1PoissonToPoissonProbability.calc_probability(home_rating, away_rating)
@@ -166,13 +167,15 @@ class V1PoissonToPoissonProbability:
 
             match_probs.append((win_prob, draw_prob, loss_prob))
             outcomes.append([win, draw, loss])
-        print(brier_multi(outcomes, match_probs))
-        return V1PoissonToPoissonProbability()
+        #We flip sign of score as we want to maximise
+        score = brier_multi(outcomes, match_probs) * -1
+        obj = V1PoissonToPoissonProbability(score)
+        write_model("v1_poisson", obj)
+        return obj
 
 if __name__ == "__main__":
-
     m = V1PoissonToLogisticProbability.train(50)
-    print(m.predict(3, 1))
+    print(m.score)
 
     m1 = V1PoissonToPoissonProbability.train(50)
-    print(m1.predict(3, 1))
+    print(m1.score)

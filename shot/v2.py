@@ -1,8 +1,6 @@
 import os
 
 from common import (random_search_cv_logistic, 
-    get_model_best_score, 
-    get_model_most_recent, 
     write_model,
     get_test_set,
     get_train_set,
@@ -55,14 +53,6 @@ class V2:
         return self.model.predict_proba(self._shots_to_features(shots, self.encoder))
 
     @staticmethod
-    def most_recent():
-        return get_model_most_recent("v2")
-
-    @staticmethod
-    def best_score():
-        return get_model_best_score("v2")
-
-    @staticmethod
     def train():
         """
         Train should return a copy of self with the actual completed model. So train is an object
@@ -87,9 +77,3 @@ class V2:
         to_obj = V2(model, score, x, y, encoder)
         write_model("v2", to_obj)
         return to_obj
-
-if __name__ == "__main__":
-
-    v2 = V2.train()
-    print(v2.score)
-    print(v2.test_score())

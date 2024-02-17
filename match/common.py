@@ -1,4 +1,7 @@
 import json
+import time
+import pickle
+import os
 
 from sklearn.metrics import make_scorer
 from sklearn.linear_model import PoissonRegressor
@@ -108,6 +111,11 @@ def get_train_set():
     tmp = [match_results[match] for match in match_results]
     return sorted(tmp, key=lambda x: x['start_date'])
 
+def get_train_set_expected_goals():
+    with open('data/train_expected_goals.json') as f:
+        expected_goals = json.load(f)
+    return expected_goals
+
 def brier_multi(targets, probs):
     return np.mean(np.sum((np.array(probs) - np.array(targets))**2, axis=1))
 
@@ -120,4 +128,25 @@ def make_brier_multi_scorer_with_lb(lb):
     When you have greater_is_better is multiplies the score by -1 and maximises.
     """
     return make_scorer(score_func=brier_multi_lb_wrapper, greater_is_better=False, response_method='predict_proba', lb=lb)
+
+def write_model(model_version, model_obj):
+    epoch = round(time.time())
+    
+    with open(f"match/models/{model_version}_{epoch}.pkl", 'wb') as f:
+        pickle.dump(model_obj, f)
+    return
+
+def get_model_best_score(model_version):
+    last_score = -np.inf
+    best_model = None
+    models = os.listdir('match/models')
+    for model_path in models:
+        path, extension = model_path.split(".")
+        version, model_type, epoch = path.split("_")
+        if version == model_version:
+            with open(f"match/models/{model_path}", "rb") as f:
+                tmp_model = pickle.load(f)
+                if tmp_model.score > last_score:
+                    best_model = tmp_model
+    return best_model
 

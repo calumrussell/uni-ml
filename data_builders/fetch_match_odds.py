@@ -98,7 +98,6 @@ if __name__ == "__main__":
         true_odds = parse_odds(parsed_odds)
         odds.extend(true_odds)
 
-
     with open(f"data/{period}_match_odds.json", 'w') as f:
         for odd in odds:
             f.write(json.dumps(odd) + "\r\n")
