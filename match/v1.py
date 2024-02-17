@@ -1,24 +1,10 @@
-from sklearn.metrics import make_scorer
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import RandomizedSearchCV
 from scipy.stats import poisson
 import numpy as np
-from sklearn.preprocessing import LabelBinarizer, label_binarize
+from sklearn.preprocessing import LabelBinarizer
 
-from common import get_train_set, PoissonTrainer
-
-def brier_multi(targets, probs):
-    return np.mean(np.sum((np.array(probs) - np.array(targets))**2, axis=1))
-
-def brier_multi_lb_wrapper(targets, probs, lb):
-    reversed = lb.transform(targets)
-    return brier_multi(reversed, probs)
-
-def make_brier_multi_scorer(lb):
-    """
-    When you have greater_is_better is multiplies the score by -1 and maximises.
-    """
-    return make_scorer(score_func=brier_multi_lb_wrapper, greater_is_better=False, response_method='predict_proba', lb=lb)
+from common import get_train_set, PoissonRatingTrainer, make_brier_multi_scorer_with_lb, brier_multi
 
 def random_search_cv_logistic(x, y):
 
@@ -26,24 +12,59 @@ def random_search_cv_logistic(x, y):
         'C': [100, 10, 1.0, 0.1, 0.01],
     }
 
-    logistic_model = LogisticRegression(multi_class="multinomial", max_iter=1000)
+    logistic_model = LogisticRegression(multi_class="multinomial")
     lb = LabelBinarizer()
     lb.fit_transform(y)
 
     random_search = RandomizedSearchCV(
             logistic_model,
             param_distributions=params,
-            scoring=make_brier_multi_scorer(lb=lb),
+            scoring=make_brier_multi_scorer_with_lb(lb=lb),
             n_jobs=5,
-            cv=10,
-            verbose=3,
-            random_state=100
+            cv=5,
     )
     random_search.fit(x,y)
     
     return (random_search.best_estimator_, random_search.best_score_)
 
-class V1_Name:
+class V1PoissonRatings:
+    """
+    Intermediate modelling stage that builds a set of ratings for each team over a window period.
+
+    We need an intermediate stage because we deploy two methods to map a pair of team ratings to
+    a match outcome.
+
+    The rating model used is composed of an independent Poisson for the offensive and defensive
+    strength of each team. The team's goal scored/goals conceded over the last N matches is used
+    as the dependent variable for the offensive and defensive model respectively. The independent
+    variable is just a dummy 1 value representing team identity (it is possible, of course, to model
+    all teams simultaneously from a certain date but it is easier to do the regressions seperately
+    in practice to ensure that windows don't overlap, you aren't using "future" data, etc.).
+    """
+    def __init__(self, ratings):
+        self.ratings = ratings
+
+    @staticmethod
+    def train(window_length):
+        """
+        Builds ratings over the training set. This is unintuitive as there can be no "training" set
+        with this kind of model as we have no idea what actual strength is. However, we may use
+        `V1PoissonToLogisticProbability` later which maps ratings to probability and this does have
+        real notions of "fit" so we want to hold out the test set until later.
+        """
+        trainer = PoissonRatingTrainer(window_length)
+
+        results = get_train_set()
+        for match in results:
+            home_id = match["team_id"]
+            away_id = match["opp_id"]
+
+            trainer.update(home_id, away_id, match["goal_for"], match["goal_against"], match["start_date"], match["match_id"])
+
+        ratings = trainer.get_ratings()
+        return V1PoissonRatings(ratings)
+
+class V1PoissonToLogisticProbability:
     """
     Goes from team rating to match probability.
 
@@ -51,12 +72,15 @@ class V1_Name:
     """
 
     @staticmethod
-    def train(v1_ratings):
+    def train(ratings_window_length):
+        ratings_model = V1PoissonRatings.train(ratings_window_length)
+        ratings = ratings_model.ratings
+
         x = []
         y = []
 
-        for match in v1_ratings.ratings:
-            rating = v1_ratings.ratings[match]
+        for match in ratings:
+            rating = ratings[match]
 
             home_rating = rating[0]
             away_rating = rating[1]
@@ -77,18 +101,21 @@ class V1_Name:
     def __init__(self):
         return
 
-class V1_AnotherName:
+class V1PoissonToPoissonProbability:
     """
     Goes from team rating to match probability using Poisson pmf.
     """
 
     @staticmethod
-    def train(v1_ratings):
+    def train(ratings_window_length):
+        ratings_model = V1PoissonRatings.train(ratings_window_length)
+        ratings = ratings_model.ratings
+
         match_probs = []
         outcomes = []
 
-        for match in v1_ratings.ratings:
-            rating = v1_ratings.ratings[match]
+        for match in ratings:
+            rating = ratings[match]
 
             home_rating = rating[0]
             away_rating = rating[1]
@@ -126,38 +153,8 @@ class V1_AnotherName:
     def __init__(self):
         return
 
-class V1Ratings:
-    """
-    Basic model used for testing:
-        * Team
-    """
-    def __init__(self, ratings):
-        self.ratings = ratings
-
-    @staticmethod
-    def train():
-        """
-        Training is more complex because we are building X Poisson regressions over Y*2*2 matches where
-        X is the number of teams and Y is the number of matches (one for each team, one for off/def).
-
-        To build a prediction for a match we need to get the off/def ratings for each team using all matches
-        up until that point.
-        """
-        trainer = PoissonTrainer()
-
-        results = get_train_set()
-        for match in results:
-            home_id = match["team_id"]
-            away_id = match["opp_id"]
-
-            trainer.update(home_id, away_id, match["goal_for"], match["goal_against"], match["start_date"], match["match_id"])
-
-        ratings = trainer.get_ratings()
-        return V1Ratings(ratings)
 
 if __name__ == "__main__":
 
-    v1_ratings = V1Ratings.train()
-
-    V1_Name.train(v1_ratings)
-    V1_AnotherName.train(v1_ratings)
+    V1PoissonToPoissonProbability.train(50)
+    V1PoissonToLogisticProbability.train(50)

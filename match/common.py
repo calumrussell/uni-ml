@@ -1,16 +1,25 @@
 import json
 
+from sklearn.metrics import make_scorer
 from sklearn.linear_model import PoissonRegressor
 from scipy.stats import poisson
 import numpy as np
 
-class PoissonTrainer:
+class PoissonRatingTrainer:
+    """
+    Offensive and defensive ratings for each team for the next match.
 
-    def __init__(self):
+    We build X*Y*2 Poisson regressions where X is the number of teams and Y is the number of 
+    matches with regressions for offensive and defensive strength.
+
+    Window_length is a hyperparameter. Represents the maximum number of matches used in regressions
+    and below this level all matches are used.
+    """
+    def __init__(self, window_length):
         self.matches = {}
         ## Indexed by match_id
         self.ratings = {}
-        self.window_length = 50
+        self.window_length = window_length
         ## Dataset shouldn't have double records but this is included to make sure that the same match
         ## isn't counted twice (which can happen if you have a row for the home and away team)
         self.calculated = {}
@@ -92,29 +101,23 @@ class PoissonTrainer:
             match_ratings[match] = (home_exp, away_exp, home_goal_diff)
         return match_ratings
 
-    @staticmethod
-    def convert_match_rating_to_probability_model(match_rating, model):
-        return model.predict_proba(match_rating)
-
-    @staticmethod
-    def convert_match_rating_to_probability_param(match_rating):
-        probs = []
-        for i in range(0, 10):
-            for j in range(0, 10):
-                home_prob = poisson.pmf(i, match_rating[0])
-                away_prob = poisson.pmf(j, match_rating[1])
-                probs.append(home_prob * away_prob)
-
-        split = [probs[i:i+10] for i in range(0,len(probs),10)]
-
-        draw_prob = (np.sum(np.diag(split)))
-        win_prob = (np.sum(np.tril(split, -1)))
-        loss_prob = (np.sum(np.triu(split, 1)))
-        return (win_prob, draw_prob, loss_prob)
-
 def get_train_set():
     with open('data/train_match_results.json') as f:
         match_results = json.load(f)
 
     tmp = [match_results[match] for match in match_results]
     return sorted(tmp, key=lambda x: x['start_date'])
+
+def brier_multi(targets, probs):
+    return np.mean(np.sum((np.array(probs) - np.array(targets))**2, axis=1))
+
+def brier_multi_lb_wrapper(targets, probs, lb):
+    reversed = lb.transform(targets)
+    return brier_multi(reversed, probs)
+
+def make_brier_multi_scorer_with_lb(lb):
+    """
+    When you have greater_is_better is multiplies the score by -1 and maximises.
+    """
+    return make_scorer(score_func=brier_multi_lb_wrapper, greater_is_better=False, response_method='predict_proba', lb=lb)
+
