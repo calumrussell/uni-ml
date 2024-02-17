@@ -71,6 +71,15 @@ class V1PoissonToLogisticProbability:
     Can use train-test split here.
     """
 
+    def __init__(self, model, score):
+        self.model = model
+        self.score = score
+
+    def predict(self, home_rating, away_rating):
+        rating_diff = home_rating - away_rating
+        pred = self.model.predict_proba([[rating_diff]])
+        return {i: j for i, j in zip(self.model.classes_, pred[0])}
+
     @staticmethod
     def train(ratings_window_length):
         ratings_model = V1PoissonRatings.train(ratings_window_length)
@@ -95,16 +104,36 @@ class V1PoissonToLogisticProbability:
             y.append(result)
 
         (model, score) = random_search_cv_logistic(x, y)
-        print(score)
-        return
-
-    def __init__(self):
-        return
+        ##Score for this model maximises a negative by flipping sign, so have to flip back.
+        return V1PoissonToLogisticProbability(model, score*-1)
 
 class V1PoissonToPoissonProbability:
     """
     Goes from team rating to match probability using Poisson pmf.
     """
+
+    def __init__(self):
+        pass
+
+    def predict(self, home_rating, away_rating):
+        probs = V1PoissonToPoissonProbability.calc_probability(home_rating, away_rating)
+        return {"win": probs[0], "draw": probs[1], "loss": probs[2]}
+
+    @staticmethod
+    def calc_probability(home_rating, away_rating):
+        probs = []
+        for i in range(0, 10):
+            for j in range(0, 10):
+                home_prob = poisson.pmf(i, home_rating)
+                away_prob = poisson.pmf(j, away_rating)
+                probs.append(home_prob * away_prob)
+
+        split = [probs[i:i+10] for i in range(0,len(probs),10)]
+
+        draw_prob = (np.sum(np.diag(split)))
+        win_prob = (np.sum(np.tril(split, -1)))
+        loss_prob = (np.sum(np.triu(split, 1)))
+        return (win_prob, draw_prob, loss_prob)
 
     @staticmethod
     def train(ratings_window_length):
@@ -121,18 +150,8 @@ class V1PoissonToPoissonProbability:
             away_rating = rating[1]
             home_goal_diff = rating[2]
 
-            probs = []
-            for i in range(0, 10):
-                for j in range(0, 10):
-                    home_prob = poisson.pmf(i, home_rating)
-                    away_prob = poisson.pmf(j, away_rating)
-                    probs.append(home_prob * away_prob)
-
-            split = [probs[i:i+10] for i in range(0,len(probs),10)]
-
-            draw_prob = (np.sum(np.diag(split)))
-            win_prob = (np.sum(np.tril(split, -1)))
-            loss_prob = (np.sum(np.triu(split, 1)))
+            (win_prob, draw_prob, loss_prob) = V1PoissonToPoissonProbability.calc_probability(
+                    home_rating, away_rating)
 
             win = 0
             draw = 0
@@ -148,13 +167,12 @@ class V1PoissonToPoissonProbability:
             match_probs.append((win_prob, draw_prob, loss_prob))
             outcomes.append([win, draw, loss])
         print(brier_multi(outcomes, match_probs))
-        return
-
-    def __init__(self):
-        return
-
+        return V1PoissonToPoissonProbability()
 
 if __name__ == "__main__":
 
-    V1PoissonToPoissonProbability.train(50)
-    V1PoissonToLogisticProbability.train(50)
+    m = V1PoissonToLogisticProbability.train(50)
+    print(m.predict(3, 1))
+
+    m1 = V1PoissonToPoissonProbability.train(50)
+    print(m1.predict(3, 1))
