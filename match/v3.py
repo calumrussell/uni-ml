@@ -170,7 +170,3 @@ class V3:
         obj = V3(score, param[0], param[1], param[2], ratings_window_length)
         write_model("v3", obj)
         return obj
-
-if __name__ == "__main__":
-    v3 = V3.train(30)
-    print(v3.score)
