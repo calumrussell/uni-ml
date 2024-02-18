@@ -104,6 +104,94 @@ class PoissonRatingTrainer:
             match_ratings[match] = (home_exp, away_exp, home_goal_diff)
         return match_ratings
 
+class PoissonRatings:
+    """
+    Intermediate modelling stage that builds a set of ratings for each team over a window period.
+
+    We need an intermediate stage because we deploy two methods to map a pair of team ratings to
+    a match outcome.
+
+    The rating model used is composed of an independent Poisson for the offensive and defensive
+    strength of each team. The team's goal scored/goals conceded over the last N matches is used
+    as the dependent variable for the offensive and defensive model respectively. The independent
+    variable is just a dummy 1 value representing team identity (it is possible, of course, to model
+    all teams simultaneously from a certain date but it is easier to do the regressions seperately
+    in practice to ensure that windows don't overlap, you aren't using "future" data, etc.).
+    """
+    def __init__(self, goal_ratings, expected_goals_ratings, window_length):
+        self.goal_ratings = goal_ratings
+        self.expected_goals_ratings = expected_goals_ratings
+        self.window_length = window_length
+
+    @staticmethod
+    def test(window_length):
+        goal_trainer = PoissonRatingTrainer(window_length)
+        expected_goal_trainer = PoissonRatingTrainer(window_length)
+
+        results = get_test_set()
+        expected_goals = get_test_set_expected_goals()
+        for match in results:
+            match_id = match["match_id"]
+            home_id = match["team_id"]
+            away_id = match["opp_id"]
+            
+            match_expected_goals = expected_goals[str(match_id)]
+
+            home_xg = match_expected_goals.get(str(home_id))
+            away_xg = match_expected_goals.get(str(away_id))
+            if not home_xg:
+                home_xg = 0
+            if not away_xg:
+                away_xg = 0
+
+            goal_trainer.update(home_id, away_id, match["goal_for"], match["goal_against"], match["start_date"], match["match_id"])
+            expected_goal_trainer.update(home_id, away_id, home_xg, away_xg, match["start_date"], match["match_id"])
+
+        goal_ratings = goal_trainer.get_ratings()
+        xg_ratings = expected_goal_trainer.get_ratings()
+        return PoissonRatings(goal_ratings, xg_ratings, window_length)
+
+    @staticmethod
+    def train(window_length):
+        """
+        Builds ratings over the training set. This is unintuitive as there can be no "training" set
+        with this kind of model as we have no idea what actual strength is. However, we may use
+        `V1PoissonToLogisticProbability` later which maps ratings to probability and this does have
+        real notions of "fit" so we want to hold out the test set until later.
+        """
+        goal_trainer = PoissonRatingTrainer(window_length)
+        expected_goal_trainer = PoissonRatingTrainer(window_length)
+
+        match_results = get_train_set()
+        expected_goals = get_train_set_expected_goals()
+        for match in match_results:
+            match_id = match["match_id"]
+            home_id = match["team_id"]
+            away_id = match["opp_id"]
+            
+            match_expected_goals = expected_goals[str(match_id)]
+
+            home_xg = match_expected_goals.get(str(home_id))
+            away_xg = match_expected_goals.get(str(away_id))
+            if not home_xg:
+                home_xg = 0
+            if not away_xg:
+                away_xg = 0
+
+            goal_trainer.update(home_id, away_id, match["goal_for"], match["goal_against"], match["start_date"], match["match_id"])
+            expected_goal_trainer.update(home_id, away_id, home_xg, away_xg, match["start_date"], match["match_id"])
+
+        goal_ratings = goal_trainer.get_ratings()
+        xg_ratings = expected_goal_trainer.get_ratings()
+        return PoissonRatings(goal_ratings, xg_ratings, window_length)
+
+def get_test_set():
+    with open('data/test_match_results.json') as f:
+        match_results = json.load(f)
+
+    tmp = [match_results[match] for match in match_results]
+    return sorted(tmp, key=lambda x: x['start_date'])
+
 def get_train_set():
     with open('data/train_match_results.json') as f:
         match_results = json.load(f)
@@ -113,6 +201,11 @@ def get_train_set():
 
 def get_train_set_expected_goals():
     with open('data/train_expected_goals.json') as f:
+        expected_goals = json.load(f)
+    return expected_goals
+
+def get_test_set_expected_goals():
+    with open('data/test_expected_goals.json') as f:
         expected_goals = json.load(f)
     return expected_goals
 
