@@ -5,7 +5,6 @@ import os
 
 from sklearn.metrics import make_scorer
 from sklearn.linear_model import PoissonRegressor
-from scipy.stats import poisson
 import numpy as np
 
 class PoissonRatingTrainer:

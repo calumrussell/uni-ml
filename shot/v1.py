@@ -3,7 +3,7 @@ from common import (random_search_cv_logistic,
     get_test_set,
     get_train_set)
 
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import mean_squared_error
 
 class V1:
     """
@@ -32,7 +32,7 @@ class V1:
 
         # We just want probability of goal
         probs = [i[1] for i in self.predict(shots)]
-        return roc_auc_score(actual, probs)
+        return mean_squared_error(actual, probs)
 
     def predict(self, shots):
         x = []

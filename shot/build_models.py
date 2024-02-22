@@ -1,6 +1,7 @@
 from v1 import V1
 from v2 import V2
 from v3 import V3
+from v4 import V4
 
 if __name__ == "__main__":
     v1 = V1.train()
@@ -11,3 +12,6 @@ if __name__ == "__main__":
 
     v3 = V3.train()
     print(v3.score)
+
+    v4 = V4.train()
+    print(v4.score)

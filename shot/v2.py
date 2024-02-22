@@ -1,12 +1,10 @@
-import os
-
+from sklearn.metrics import mean_squared_error
 from common import (random_search_cv_logistic, 
     write_model,
     get_test_set,
     get_train_set,
     ShotFeatures)
 
-from sklearn.metrics import roc_auc_score
 from sklearn.preprocessing import OneHotEncoder
 
 class V2:
@@ -47,7 +45,7 @@ class V2:
 
         # We just want probability of goal
         probs = [i[1] for i in self.predict(shots)]
-        return roc_auc_score(actual, probs)
+        return mean_squared_error(actual, probs)
 
     def predict(self, shots):
         return self.model.predict_proba(self._shots_to_features(shots, self.encoder))
