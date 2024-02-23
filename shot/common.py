@@ -3,7 +3,7 @@ import pickle
 import os
 import json
 
-from sklearn.metrics import make_scorer, mean_squared_error
+from sklearn.metrics import accuracy_score, make_scorer, mean_absolute_error, mean_squared_error
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import RandomizedSearchCV
 import xgboost as xgb
@@ -49,9 +49,9 @@ def make_shot_scorer():
     is better than one predicts 40% for a shot that goes in, even though both are wrong the first 
     more accurate).
 
-    We just wrap mean_squared error because this is unusual for a classification model.
+    We just wrap mean absolute error because this is unusual for a classification model.
     """
-    return make_scorer(score_func=mean_squared_error, greater_is_better=False, response_method='predict_proba')
+    return make_scorer(score_func=mean_absolute_error, greater_is_better=False, response_method='predict_proba')
 
 def write_model(model_version, model_obj):
     epoch = round(time.time())
@@ -77,7 +77,7 @@ def get_test_set():
     return shots
 
 def get_model_best_score():
-    last_score = 0
+    last_score = 1
     best_model = None
     models = os.listdir('shot/models')
     for model_path in models:
@@ -85,9 +85,10 @@ def get_model_best_score():
         version, epoch = path.split("_")
         with open(f"shot/models/{model_path}", "rb") as f:
             tmp_model = pickle.load(f)
-            if float(tmp_model.score) < last_score:
+            score = tmp_model.test_score()
+            if float(score) < last_score:
                 best_model = tmp_model
-                last_score = tmp_model.score
+                last_score = score
     return best_model
 
 def get_model_most_recent():

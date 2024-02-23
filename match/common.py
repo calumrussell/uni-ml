@@ -32,7 +32,7 @@ class PoissonRatingTrainer:
         for team in teams:
             team_matches = self.matches[team]
             ## If we only have one match, we can't use this to predict
-            if len(team_matches) < 2:
+            if len(team_matches) < 6:
                 continue
             
             last_match_id = team_matches[-1][3]
@@ -47,8 +47,8 @@ class PoissonRatingTrainer:
 
             team_match_hash = hash(str(team) + str(last_match_id))
             if team_match_hash not in self.calculated:
-                goals_for = [i[0] for i in window]
-                goals_against = [i[1] for i in window]
+                goals_for = [min(i[0], 4) for i in window]
+                goals_against = [min(i[1], 4) for i in window]
                 ## Each regression is composed of matches for a single team, so we are just aiming
                 ## to recover the X value for a single team at a time
                 team_input = [[1] for i in window]

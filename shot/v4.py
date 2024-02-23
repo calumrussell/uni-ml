@@ -1,4 +1,3 @@
-from sklearn.metrics import mean_squared_error
 from common import (random_search_cv_xgb, 
     write_model,
     get_test_set,
@@ -6,6 +5,7 @@ from common import (random_search_cv_xgb,
     ShotFeatures)
 
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.metrics import mean_absolute_error
 
 class V4:
     """
@@ -58,7 +58,7 @@ class V4:
 
         # We just want probability of goal
         probs = [i[1] for i in self.predict(shots)]
-        return mean_squared_error(actual, probs)
+        return mean_absolute_error(actual, probs)
 
     def predict(self, shots):
         return self.model.predict_proba(self._shots_to_features(shots, self.encoder))

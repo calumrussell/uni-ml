@@ -49,8 +49,8 @@ class V2:
             goal_rating = goal_ratings[match]
             expected_goal_rating = expected_goals_ratings[match]
 
-            home_rating = goal_rating[0]
-            away_rating = goal_rating[1]
+            home_rating = min(goal_rating[0], 4)
+            away_rating = min(goal_rating[1], 4)
             home_goal_diff = goal_rating[2]
 
             x_home_rating = expected_goal_rating[0]
@@ -83,6 +83,7 @@ class V2:
                 else:
                     loss = p
             preds.append([win, draw, loss])
+
         return brier_multi(actuals, preds) * -1
 
     @staticmethod
@@ -118,3 +119,7 @@ class V2:
         write_model("v2", obj)
         return obj
 
+if __name__ == "__main__":
+    v2 = V2.train(40)
+    print(v2.test_score())
+    print(v2.score)
