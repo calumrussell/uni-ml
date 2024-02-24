@@ -58,6 +58,33 @@ class Odds:
         return
 
     @staticmethod
+    def bootstrap_test(n, window):
+        actuals = []
+        preds = []
+
+        rows = []
+        with open('data/test_match_odds.json') as f:
+            for line in f.readlines():
+                rows.append(line)
+
+        for i in range(n):
+            matches = np.random.choice(rows, window, replace=False)
+            tmp_actuals = []
+            tmp_preds = []
+            for match in matches:
+                row = parse_row(json.loads(match))
+                tmp_actuals.append(row[0])
+                tmp_preds.append(row[1])
+            actuals.append(tmp_actuals)
+            preds.append(tmp_preds)
+
+        results = []
+        for a, p in zip(actuals, preds):
+            results.append(brier_multi(a, p))
+        print(np.mean(results), np.median(results), np.std(results))
+        return
+
+    @staticmethod
     def train():
         actuals = []
         preds = []
@@ -73,3 +100,4 @@ if __name__ == "__main__":
     Odds.train()
     Odds.test()
     Odds.bootstrap_train(50, 100)
+    Odds.bootstrap_test(50, 100)

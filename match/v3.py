@@ -5,6 +5,11 @@ from scipy.optimize import minimize
 from common import brier_multi, PoissonRatings, write_model
 
 def calculate_merged_prob(goal_rating, expected_goal_rating, corr_goal, corr_expected, weight):
+    """
+    This calculates win/draw/loss probabilities for a single match from the two bivariate Poissons
+    for goal rating and expected goal rating estimates.
+    """
+
     home_rating = goal_rating[0]
     away_rating = goal_rating[1]
 
@@ -23,6 +28,10 @@ def calculate_merged_prob(goal_rating, expected_goal_rating, corr_goal, corr_exp
     return (merged_win_prob, merged_draw_prob, merged_loss_prob)
 
 def bipoiss_pmf(x, y, a, b, c, acc=50):
+    """
+    This is the bivariate Poisson definition taken from Karlis and Ioannis, 2003.
+    """
+
     if x < 0 or y < 0:
         raise ValueError
 
@@ -34,6 +43,16 @@ def bipoiss_pmf(x, y, a, b, c, acc=50):
     return first * sum(vals)
 
 def _loss_bipoisson(par, matches, goal_ratings, expected_goal_ratings):
+    """
+    Optimization function, the loss is brier score which is roughly equivalent to MSE
+    over a probability space. Poisson ratings are not parameters and are taken
+    directly from the rating models. As two rating models are used the relative weight
+    of each model is a parameter, with a correlation parameter for each bivariate
+    Poisson for goal and expected goal rating.
+
+    Par: [goal_corr, expected_goal_corr, expected_goal_weighting]
+    """
+
     if par[0] < 0 or par[0] >= 1:
         return np.inf
 
@@ -70,15 +89,21 @@ def _loss_bipoisson(par, matches, goal_ratings, expected_goal_ratings):
     return score
 
 class V3:
+    """
+    Minimizes bivariate Poisson mapping from goal and expected goal Poissons to match probability.
+
+    Design is unusual because we are optimizing for three parameters but are using the actual
+    ratings themselves as parameters for the independent Poissons.
+    """
     def __init__(self, score, goal_corr, expected_goal_corr, weight, window_length):
         self.score = score
         self.goal_corr = goal_corr
         self.expected_goal_corr = expected_goal_corr
         self.weight = weight
-        self.window_length = window_length
+        self.ratings_window_length = window_length
 
     def test_score(self):
-        ratings_model = PoissonRatings.test(self.window_length)
+        ratings_model = PoissonRatings.test(self.ratings_window_length)
         goal_ratings = ratings_model.goal_ratings
         expected_goal_ratings = ratings_model.expected_goals_ratings
 

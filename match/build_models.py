@@ -3,8 +3,12 @@ from v2 import V2
 from v3 import V3
 from v4 import V4
 from v5 import V5
+from v6 import V6
 
 if __name__ == "__main__":
+
+    import warnings
+    warnings.filterwarnings("ignore")
 
     windows = [10, 20, 30, 40, 50, 75, 100]
     for window in windows:
@@ -21,5 +25,8 @@ if __name__ == "__main__":
         v4 = V4.train(window)
         print(v4.score)
 
-        v5= V5.train(window)
+        v5 = V5.train(window)
         print(v5.score)
+
+        v6 = V6.train(window)
+        print(v6.score)

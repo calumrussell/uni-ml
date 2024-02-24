@@ -3,12 +3,20 @@ import pickle
 import os
 import json
 
-from sklearn.metrics import accuracy_score, make_scorer, mean_absolute_error, mean_squared_error
+from sklearn.metrics import make_scorer, brier_score_loss
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import RandomizedSearchCV
 import xgboost as xgb
 
 class ShotFeatures:
+    """
+    Categorical features used in shot prediction model.
+
+    location - region of the opponent's half from which the shot was taken
+    play - type of play within which the shot was taken
+    body_part - part of shooter's body used to take the shot
+    """
+
     location = [
         'BoxCentre',
         'BoxLeft',
@@ -42,6 +50,7 @@ class ShotFeatures:
         'OtherBodyPart',
         'RightFoot']
 
+
 def make_shot_scorer():
     """
     Almost all predictions will come back as miss and skew our score. Although we are technically
@@ -49,9 +58,9 @@ def make_shot_scorer():
     is better than one predicts 40% for a shot that goes in, even though both are wrong the first 
     more accurate).
 
-    We just wrap mean absolute error because this is unusual for a classification model.
+    Brier score is equivalent to MSE for classification.
     """
-    return make_scorer(score_func=mean_absolute_error, greater_is_better=False, response_method='predict_proba')
+    return make_scorer(score_func=brier_score_loss, greater_is_better=False, response_method='predict_proba')
 
 def write_model(model_version, model_obj):
     epoch = round(time.time())
@@ -91,23 +100,6 @@ def get_model_best_score():
                 last_score = score
     return best_model
 
-def get_model_most_recent():
-    last = -1
-    most_recent_model_path = None
-
-    models = os.listdir('shot/models')
-    for model_path in models:
-        path, extension = model_path.split(".")
-        version, epoch = path.split("_")
-        if int(epoch) > int(last):
-            last = epoch
-            most_recent_model_path = model_path
-
-    if most_recent_model_path:
-        with open(f"shot/models/{most_recent_model_path}", "rb") as f:
-            return pickle.load(f)
-    return
-
 def random_search_cv_xgb(x, y):
     params = {
         'min_child_weight': [1, 5, 10],
@@ -122,8 +114,8 @@ def random_search_cv_xgb(x, y):
             xgb_model, 
             param_distributions=params, 
             scoring=make_shot_scorer(), 
-            n_jobs=5, 
-            cv=5, 
+            n_iter=20, 
+            cv=10, 
     )
 
     random_search.fit(x,y)
@@ -131,8 +123,16 @@ def random_search_cv_xgb(x, y):
 
 def random_search_cv_logistic(x, y):
     params = {
-        'solver': ['newton-cg', 'lbfgs', 'liblinear'],
-        'penalty': ['l2'],
+        'class_weight': [
+            {0: 0.5, 1: 0.5},
+            {0: 0.75, 1: 0.25},
+            {0: 0.25, 1: 0.75},
+            {0: 0.6, 1: 0.4},
+            {0: 0.4, 1: 0.6},
+            None,
+        ],
+        'solver': ['lbfgs', 'liblinear', 'newton-cholesky', 'newton-cg'],
+        'penalty': ['l2', None],
         'C': [100, 10, 1.0, 0.1, 0.01],
     }
 
@@ -141,8 +141,8 @@ def random_search_cv_logistic(x, y):
             logistic_model,
             param_distributions=params,
             scoring=make_shot_scorer(),
-            n_jobs=4,
-            cv=5,
+            n_iter=20,
+            cv=10,
     )
     random_search.fit(x,y)
     return (random_search.best_estimator_, random_search.best_score_)

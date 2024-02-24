@@ -17,9 +17,10 @@ def dixon_coles_multiplier(home, away, home_prob, away_prob, rho):
 
 class V5:
     """
-    Goes from team rating to match probability using Poisson pmf.
+    Uses Poisson pmf to calculate goal probabilities from goal ratings (which
+    are just Poisson variables). Uses Dixon-Coles adjustment to correct for
+    Poisson overdispersion.
     """
-
     def __init__(self, score, ratings_window_length):
         self.score = score
         self.ratings_window_length = ratings_window_length
@@ -35,6 +36,7 @@ class V5:
             for j in range(0, 10):
                 home_prob = poisson.pmf(i, home_rating)
                 away_prob = poisson.pmf(j, away_rating)
+                ## We hardcode the rho parameter, with more time you would train this
                 probs.append(home_prob * away_prob * dixon_coles_multiplier(i, j, home_prob, away_prob, -0.05))
 
         split = [probs[i:i+10] for i in range(0,len(probs),10)]

@@ -3,7 +3,7 @@ from common import (random_search_cv_logistic,
     get_test_set,
     get_train_set)
 
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import brier_score_loss
 
 class V1:
     """
@@ -29,16 +29,13 @@ class V1:
         actual = []
         for shot in shots:
             actual.append(shot["result"])
-
-        # We just want probability of goal
-        probs = [i[1] for i in self.predict(shots)]
-        return mean_absolute_error(actual, probs)
+        return brier_score_loss(actual, self.predict(shots))
 
     def predict(self, shots):
         x = []
         for shot in shots:
             x.append(V1._shot_to_features(shot))
-        return self.model.predict_proba(x)
+        return [i[1] for i in self.model.predict_proba(x)]
 
     @staticmethod
     def train():
@@ -55,6 +52,11 @@ class V1:
             x.append(V1._shot_to_features(shot))
 
         (model, score) = random_search_cv_logistic(x, y)
-        to_obj = V1(model, score, x, y)
+        to_obj = V1(model, score*-1, x, y)
         write_model("v1", to_obj)
         return to_obj
+
+if __name__ == "__main__":
+    v1 = V1.train()
+    print(v1.score)
+    print(v1.test_score())

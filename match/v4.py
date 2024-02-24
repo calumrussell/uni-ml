@@ -5,9 +5,9 @@ from common import PoissonRatings, brier_multi, write_model
 
 class V4:
     """
-    Goes from team rating to match probability using Poisson pmf.
+    Uses Poisson pmf to calculate goal probabilities from goal ratings (which
+    are just Poisson variables).
     """
-
     def __init__(self, score, ratings_window_length):
         self.score = score
         self.ratings_window_length = ratings_window_length

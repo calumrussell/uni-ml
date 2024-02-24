@@ -7,6 +7,8 @@ from common import make_brier_multi_scorer_with_lb, write_model, PoissonRatings,
 def random_search_cv_logistic(x, y):
 
     params = {
+        'solver': ['lbfgs', 'newton-cg'],
+        'penalty': ['l2', None],
         'C': [100, 10, 1.0, 0.1, 0.01],
     }
 
@@ -18,9 +20,8 @@ def random_search_cv_logistic(x, y):
             logistic_model,
             param_distributions=params,
             scoring=make_brier_multi_scorer_with_lb(lb=lb),
-            n_iter=5,
-            n_jobs=5,
-            cv=5,
+            n_iter=20,
+            cv=10,
     )
     random_search.fit(x,y)
     
@@ -28,11 +29,8 @@ def random_search_cv_logistic(x, y):
 
 class V1:
     """
-    Goes from team rating to match probability.
-
-    Can use train-test split here.
+    Multiclass logistic classifier that uses difference of team goal rating as param.
     """
-
     def __init__(self, model, score, ratings_window_length):
         self.model = model
         self.score = score

@@ -28,6 +28,21 @@ class PoissonRatingTrainer:
         return
 
     def _optimize(self):
+        """
+        Optimization layer is called on every match update and iterates over every team and tries
+        to perform a rating update if the team has played at least five matches.
+
+        This is very expensive, in theory, but is done this way because it can be tricky to update
+        both teams at the same time. We guard against duplicated operations by storing a cache of
+        already seen match/team combinations.
+
+        The design of the Poisson regression is also unusual as each regression is just equivalent
+        to an independent Poisson variable with no parameters apart from the intercept (representing
+        the team as a "dummy" binary variable). Again, this is done so that we can work on
+        individual teams rather than matches. It is possible to run this more cheaply with every
+        team having their own parameter (i.e. every team is just an independent Poisson) but it is
+        very difficult to order when teams may not play sequentially.
+        """
         teams = self.matches.keys()
         for team in teams:
             team_matches = self.matches[team]
@@ -45,6 +60,7 @@ class PoissonRatingTrainer:
             else:
                 window = team_matches[:-1]
 
+            #Hash used to stop duplicated operations
             team_match_hash = hash(str(team) + str(last_match_id))
             if team_match_hash not in self.calculated:
                 goals_for = [min(i[0], 4) for i in window]
@@ -105,18 +121,18 @@ class PoissonRatingTrainer:
 
 class PoissonRatings:
     """
-    Intermediate modelling stage that builds a set of ratings for each team over a window period.
+    Intermediate modelling stage that builds a set of ratings for both teams in a given match
+    using historical data from their previous N matches (where N is a model hyperparamter).
 
-    We need an intermediate stage because we deploy two methods to map a pair of team ratings to
-    a match outcome.
+    Each team has offensive and defensive rating which are just independent Poissons. Two rating
+    models are built simultaneously using goals and expected goals as an input.
 
-    The rating model used is composed of an independent Poisson for the offensive and defensive
-    strength of each team. The team's goal scored/goals conceded over the last N matches is used
-    as the dependent variable for the offensive and defensive model respectively. The independent
-    variable is just a dummy 1 value representing team identity (it is possible, of course, to model
-    all teams simultaneously from a certain date but it is easier to do the regressions seperately
-    in practice to ensure that windows don't overlap, you aren't using "future" data, etc.).
+    The concept of train and test makes no sense in the context of the ratings models which is
+    modelling an unobserved variable so has unknown loss. However, the next layers of the model
+    that map from ratings to probabilities do have train and test so we have to represent this
+    here.
     """
+
     def __init__(self, goal_ratings, expected_goals_ratings, window_length):
         self.goal_ratings = goal_ratings
         self.expected_goals_ratings = expected_goals_ratings
@@ -209,15 +225,24 @@ def get_test_set_expected_goals():
     return expected_goals
 
 def brier_multi(targets, probs):
+    """
+    There is no brier score for muticlass probabilities so we have to code this here.
+    https://en.wikipedia.org/wiki/Brier_score#Definition
+    """
     return np.mean(np.sum((np.array(probs) - np.array(targets))**2, axis=1))
 
 def brier_multi_lb_wrapper(targets, probs, lb):
+    """
+    We have to wrap the above function with a label binarizer so that we can go from
+    categorical input to encoded binary input.
+    """
     reversed = lb.transform(targets)
     return brier_multi(reversed, probs)
 
 def make_brier_multi_scorer_with_lb(lb):
     """
-    When you have greater_is_better is multiplies the score by -1 and maximises.
+    Greater is better flips the sign of the score function. Brier score is higher when closer to zero
+    so the score will come out of this with the sign flipped.
     """
     return make_scorer(score_func=brier_multi_lb_wrapper, greater_is_better=False, response_method='predict_proba', lb=lb)
 
@@ -227,18 +252,4 @@ def write_model(model_version, model_obj):
     with open(f"match/models/{model_version}_{epoch}.pkl", 'wb') as f:
         pickle.dump(model_obj, f)
     return
-
-def get_model_best_score(model_version):
-    last_score = -np.inf
-    best_model = None
-    models = os.listdir('match/models')
-    for model_path in models:
-        path, extension = model_path.split(".")
-        version, model_type, epoch = path.split("_")
-        if version == model_version:
-            with open(f"match/models/{model_path}", "rb") as f:
-                tmp_model = pickle.load(f)
-                if tmp_model.score > last_score:
-                    best_model = tmp_model
-    return best_model
 

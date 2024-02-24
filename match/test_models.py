@@ -2,6 +2,9 @@ import os
 import pickle
 
 if __name__ == "__main__":
+    """
+    Used for returning the test scores of all the models currently saved to file.
+    """
     models_folder = 'match/models'
     models = os.listdir(models_folder)
     for model in models:

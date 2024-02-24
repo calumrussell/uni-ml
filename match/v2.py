@@ -7,6 +7,8 @@ from common import PoissonRatings, make_brier_multi_scorer_with_lb, write_model,
 def random_search_cv_logistic(x, y):
 
     params = {
+        'solver': ['lbfgs', 'newton-cg'],
+        'penalty': ['l2', None],
         'C': [100, 10, 1.0, 0.1, 0.01],
     }
 
@@ -18,15 +20,18 @@ def random_search_cv_logistic(x, y):
             logistic_model,
             param_distributions=params,
             scoring=make_brier_multi_scorer_with_lb(lb=lb),
-            n_iter=5,
-            n_jobs=5,
-            cv=5,
+            n_iter=20,
+            cv=10,
     )
     random_search.fit(x,y)
     
     return (random_search.best_estimator_, random_search.best_score_)
 
 class V2:
+    """
+    Multiclass logistic classifier that uses difference of team goal rating and difference of
+    expected goal rating.
+    """
     def __init__(self, model, score, ratings_window_length):
         self.model = model
         self.score = score
@@ -118,8 +123,3 @@ class V2:
         obj = V2(model, score, ratings_window_length)
         write_model("v2", obj)
         return obj
-
-if __name__ == "__main__":
-    v2 = V2.train(40)
-    print(v2.test_score())
-    print(v2.score)

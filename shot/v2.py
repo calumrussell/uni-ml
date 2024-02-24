@@ -5,7 +5,7 @@ from common import (random_search_cv_logistic,
     ShotFeatures)
 
 from sklearn.preprocessing import OneHotEncoder
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import brier_score_loss
 
 class V2:
     """
@@ -42,13 +42,10 @@ class V2:
         actual = []
         for shot in shots:
             actual.append(shot["result"])
-
-        # We just want probability of goal
-        probs = [i[1] for i in self.predict(shots)]
-        return mean_absolute_error(actual, probs)
+        return brier_score_loss(actual, self.predict(shots))
 
     def predict(self, shots):
-        return self.model.predict_proba(self._shots_to_features(shots, self.encoder))
+        return [i[1] for i in self.model.predict_proba(self._shots_to_features(shots, self.encoder))]
 
     @staticmethod
     def train():
@@ -72,6 +69,6 @@ class V2:
         x = V2._shots_to_features(shots, encoder)
 
         (model, score) = random_search_cv_logistic(x, y)
-        to_obj = V2(model, score, x, y, encoder)
+        to_obj = V2(model, score*-1, x, y, encoder)
         write_model("v2", to_obj)
         return to_obj

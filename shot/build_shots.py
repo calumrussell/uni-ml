@@ -26,14 +26,13 @@ if __name__ == "__main__":
             match_id = int(shot['match_id'])
             team_id = int(shot['team_id'])
 
-            score_prob = pred[1]
             if match_id not in matches:
                 matches[match_id] = {}
 
             if team_id not in matches[match_id]:
                 matches[match_id][team_id] = 0
 
-            matches[match_id][team_id] += score_prob
+            matches[match_id][team_id] += pred
 
     with open(f"data/{period}_expected_goals.json", "w") as f:
         json.dump(matches, f)

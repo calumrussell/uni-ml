@@ -4,6 +4,10 @@ from v3 import V3
 from v4 import V4
 
 if __name__ == "__main__":
+
+    import warnings
+    warnings.filterwarnings("ignore")
+
     v1 = V1.train()
     print(v1.score)
 
