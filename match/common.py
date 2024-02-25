@@ -168,10 +168,8 @@ class PoissonRatings:
     @staticmethod
     def train(window_length):
         """
-        Builds ratings over the training set. This is unintuitive as there can be no "training" set
-        with this kind of model as we have no idea what actual strength is. However, we may use
-        `V1PoissonToLogisticProbability` later which maps ratings to probability and this does have
-        real notions of "fit" so we want to hold out the test set until later.
+        Builds ratings over the training set. This layer doesn't need train/test split but other
+        layers do.
         """
         goal_trainer = PoissonRatingTrainer(window_length)
         expected_goal_trainer = PoissonRatingTrainer(window_length)
@@ -226,6 +224,7 @@ def get_test_set_expected_goals():
 def brier_multi(targets, probs):
     """
     There is no brier score for muticlass probabilities in Python libs so we have to code this here.
+    Similar to MSE but over probability space
     https://en.wikipedia.org/wiki/Brier_score#Definition
     """
     return np.mean(np.sum((np.array(probs) - np.array(targets))**2, axis=1))

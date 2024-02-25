@@ -1,8 +1,5 @@
 import os
 import pickle
-import numpy as np
-
-np.set_printoptions(suppress=True)
 
 best = {}
 

@@ -12,3 +12,7 @@ train.sh - used to train both models, write expected goals data to file using be
 before starting match prediction.
 
 test.sh - reports test performance of all models on file
+
+The raw events are the most space-consuming part of the model so these have been ommitted from the
+zip file. However, all of the scripts should still work as the raw events are passed into
+intermediate formats for use within the models.
