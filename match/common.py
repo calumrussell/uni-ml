@@ -1,7 +1,6 @@
 import json
 import time
 import pickle
-import os
 
 from sklearn.metrics import make_scorer
 from sklearn.linear_model import PoissonRegressor
@@ -226,7 +225,7 @@ def get_test_set_expected_goals():
 
 def brier_multi(targets, probs):
     """
-    There is no brier score for muticlass probabilities so we have to code this here.
+    There is no brier score for muticlass probabilities in Python libs so we have to code this here.
     https://en.wikipedia.org/wiki/Brier_score#Definition
     """
     return np.mean(np.sum((np.array(probs) - np.array(targets))**2, axis=1))
@@ -234,7 +233,7 @@ def brier_multi(targets, probs):
 def brier_multi_lb_wrapper(targets, probs, lb):
     """
     We have to wrap the above function with a label binarizer so that we can go from
-    categorical input to encoded binary input.
+    categorical targets to binary targets.
     """
     reversed = lb.transform(targets)
     return brier_multi(reversed, probs)

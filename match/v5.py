@@ -4,6 +4,12 @@ import numpy as np
 from common import PoissonRatings, brier_multi, write_model
 
 def dixon_coles_multiplier(home, away, home_prob, away_prob, rho):
+    """
+    http://www.ajbuckeconbikesail.net/wkpapers/Airports/MVPoisson/soccer_betting.pdf
+    
+    This paper is referenced in the report, this is just a link I used to write the code.
+    """
+
     if home == 0 and away == 0:
         return 1.0 - (home_prob * away_prob * rho)
     elif home == 1 and away == 0:
